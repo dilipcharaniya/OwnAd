@@ -1,3 +1,0 @@
-include ':OwenAds'
-include ':app'
-rootProject.name = "My Application Ads"
