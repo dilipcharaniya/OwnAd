@@ -5,8 +5,12 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -24,26 +28,32 @@ import androidx.annotation.AnimRes;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.palette.graphics.Palette;
 
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Random;
 
 public class OwnAds {
 
     // Timer
     public static Handler handler = new Handler();
     private static Runnable mRunnable;
-    private static AdListener mAdListener;
+
     private String TAG = this.getClass().getSimpleName();
     //
     private String countSP = "countSP";
@@ -54,8 +64,19 @@ public class OwnAds {
     private int bannerCount = 0;
     private MyAdView currentAdView;
 
+    private ArrayList<BannerAd> bannerAds = new ArrayList<>();
+    private ArrayList<InterstitialAdModel> interstitialAds = new ArrayList<>();
+    private ArrayList<InterstitialAdModel> NativeAds = new ArrayList<>();
+    private String feedbackEmail = "";
+    private String sharePreString = "Check out this Amazing Android App: ";
+    private int rate = 0;
+    boolean shuffleDialogAds = false;
+    boolean menInBlack = false;
+
+
     private int lastLoaded = 0;
     private static boolean isAdLoaded = false;
+    public static boolean isAdLoadedNative = false;
     public static Bitmap bitmap_icon, bitmap_photo;
     public static String urlClicked = "";
     public static String adTitle = "";
@@ -63,14 +84,19 @@ public class OwnAds {
     public static String adPrice = "";
     public static String adButtonText = "";
     public static Float adRating;
-    private ArrayList<BannerAd> bannerAds = new ArrayList<>();
-    private ArrayList<InterstitialAd> interstitialAds = new ArrayList<>();
+    private static AdListener mAdListener;
 
-    private String feedbackEmail = "";
-    private String sharePreString = "Check out this Amazing Android App: ";
-    private int rate = 0;
-    boolean shuffleDialogAds = false;
-    boolean menInBlack = false;
+    public static OwnAdsNativeView nativeAdView;
+    private View customNativeView;
+    private NativeAdListener mNativeAdListener;
+    private NativeAdListener.CallToActionListener ctaListener;
+    public static ImageView icon;
+    public static ImageView headerImage;
+    public static RatingBar ratings;
+    public static TextView title;
+    public static TextView description;
+    public static TextView price;
+    public static Button cta;
 
     public OwnAds(final Context context, String url) {
         this.context = context;
@@ -83,17 +109,13 @@ public class OwnAds {
                     JSONObject roote = new JSONObject(string);
                     JSONArray jsonArray = roote.optJSONArray("apps");
                     JSONArray jsonArray2 = roote.optJSONArray("apps");
+                    JSONArray jsonArray3 = roote.optJSONArray("apps");
+
                     bannerAds = new ArrayList<>();
                     interstitialAds = new ArrayList<>();
+                    NativeAds = new ArrayList<>();
                     for (int i = 0; i < jsonArray.length(); i++) {
                         JSONObject object = jsonArray.getJSONObject(i);
-//                bannerAds = new BannerAd(
-//                        object.getString("app_icon"),
-//                        object.getString("app_title"),
-//                        object.getString("app_desc"),
-//                        object.getString("app_uri"),
-//                        object.getString("app_uri"),
-//                        object.getString("app_rating"
                         Log.e("BANNNNN", "" + object);
                         if (object.optString("app_adType").equals("banner")) {
                             bannerAds.add(new BannerAd(object.getString("app_icon"),
@@ -107,16 +129,23 @@ public class OwnAds {
 
                     for (int i = 0; i < jsonArray2.length(); i++) {
                         JSONObject object = jsonArray2.getJSONObject(i);
-//                bannerAds = new BannerAd(
-//                        object.getString("app_icon"),
-//                        object.getString("app_title"),
-//                        object.getString("app_desc"),
-//                        object.getString("app_uri"),
-//                        object.getString("app_uri"),
-//                        object.getString("app_rating"
                         Log.e("BANNNNN", "" + object);
                         if (object.optString("app_adType").equals("interstitial")) {
-                            interstitialAds.add(new InterstitialAd(object.getString("app_icon"),
+                            interstitialAds.add(new InterstitialAdModel(object.getString("app_icon"),
+                                    object.getString("app_title"),
+                                    object.getString("app_desc"),
+                                    object.getString("app_header_image"),
+                                    object.getString("app_uri"),
+                                    object.getString("app_cta_text"),
+                                    object.getString("app_price"),
+                                    object.getString("app_rating")));
+                        }
+                    }
+
+                    for (int i = 0; i < jsonArray3.length(); i++) {
+                        JSONObject object = jsonArray3.getJSONObject(i);
+                        if (object.optString("app_adType").equals("native")) {
+                            NativeAds.add(new InterstitialAdModel(object.getString("app_icon"),
                                     object.getString("app_title"),
                                     object.getString("app_desc"),
                                     object.getString("app_header_image"),
@@ -196,6 +225,18 @@ public class OwnAds {
         });
     }
 
+    public void autoChangeNativeAds(final int intervalSeconds) {
+        doSomethingAfter(intervalSeconds, new Runnable() {
+            @Override
+            public void run() {
+
+                loadNative();
+                autoChangeNativeAds(intervalSeconds);
+
+            }
+        });
+    }
+
     private void removeSameAppAds() {
         for (int i = 0; i < bannerAds.size(); i++) {
             if (bannerAds.get(i).getPackageNameOrUrl().contains(context.getPackageName())) {
@@ -212,7 +253,7 @@ public class OwnAds {
     public void loadInterstitial() {
         Log.e("IHIHI", "" + interstitialAds.size());
         if (interstitialAds.size() > 0) {
-            InterstitialAd modal = (InterstitialAd) interstitialAds.get(this.lastLoaded);
+            InterstitialAdModel modal = (InterstitialAdModel) interstitialAds.get(this.lastLoaded);
             if (this.lastLoaded == interstitialAds.size() - 1) {
                 this.lastLoaded = 0;
             } else {
@@ -428,6 +469,155 @@ public class OwnAds {
             context.startActivity(new Intent(Intent.ACTION_VIEW,
                     Uri.parse("http://play.google.com/store/apps/details?id=" + context.getPackageName())));
         }
+    }
+
+    public void loadNative() {
+        if (NativeAds.size() > 0) {
+            lastLoaded = new Random().nextInt(NativeAds.size());
+            final InterstitialAdModel dialogModal = (InterstitialAdModel) NativeAds.get(lastLoaded);
+            if (lastLoaded == NativeAds.size() - 1) {
+                lastLoaded = 0;
+            } else {
+                ++lastLoaded;
+            }
+
+
+            if (this.nativeAdView != null) {
+                OwnAdsNativeView view = this.nativeAdView;
+                title = view.getTitle();
+                description = view.getDescription();
+                price = view.getPrice();
+                cta = view.getCta();
+                icon = view.getIcon();
+                headerImage = view.getHeaderImage();
+                ratings = view.getRatings();
+            } else {
+
+                if (this.customNativeView == null) {
+//                    throw new NullPointerException("NativeAdView is Null. Either pass HouseAdsNativeView or a View in setNativeAdView()");
+                }
+
+                title = (TextView) this.customNativeView.findViewById(R.id.houseAds_title);
+                description = (TextView) this.customNativeView.findViewById(R.id.houseAds_description);
+                price = (TextView) this.customNativeView.findViewById(R.id.houseAds_price);
+                cta = this.customNativeView.findViewById(R.id.houseAds_cta);
+                icon = (ImageView) this.customNativeView.findViewById(R.id.houseAds_app_icon);
+                headerImage = (ImageView) this.customNativeView.findViewById(R.id.houseAds_header_image);
+                ratings = (RatingBar) this.customNativeView.findViewById(R.id.houseAds_rating);
+            }
+
+            Picasso.get().load(dialogModal.getIconUrl()).into(new Target() {
+                public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
+                    icon.setImageBitmap(resource);
+                }
+
+                public void onBitmapFailed(Exception e, Drawable errorDrawable) {
+                    OwnAds.this.isAdLoadedNative = false;
+                    if ((headerImage == null || dialogModal.getLargeImageUrl().isEmpty()) && OwnAds.this.mNativeAdListener != null) {
+                        OwnAds.this.mNativeAdListener.onAdLoadFailed(e);
+                    }
+
+                }
+
+                public void onPrepareLoad(Drawable placeHolderDrawable) {
+                }
+            });
+            Picasso.get().load(dialogModal.getLargeImageUrl()).into(new Target() {
+                public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
+                    if (headerImage != null) {
+                        headerImage.setVisibility(View.VISIBLE);
+                        headerImage.setImageBitmap(resource);
+                    }
+
+                    OwnAds.this.isAdLoadedNative = true;
+                    if (OwnAds.this.mNativeAdListener != null) {
+                        OwnAds.this.mNativeAdListener.onAdLoaded();
+                    }
+                }
+
+                public void onBitmapFailed(Exception e, Drawable errorDrawable) {
+                    OwnAds.this.isAdLoadedNative = false;
+                    if ((headerImage == null || dialogModal.getLargeImageUrl().isEmpty()) && OwnAds.this.mNativeAdListener != null) {
+                        OwnAds.this.mNativeAdListener.onAdLoadFailed(e);
+                    }
+                }
+
+                public void onPrepareLoad(Drawable placeHolderDrawable) {
+                }
+            });
+
+
+            title.setText(dialogModal.getAppTitle());
+            description.setText(dialogModal.getAppDesc());
+            if (price != null) {
+                price.setVisibility(View.VISIBLE);
+                if (!dialogModal.getPrice().trim().isEmpty()) {
+                    price.setText(String.format("Price: %s", dialogModal.getPrice()));
+                } else {
+                    price.setVisibility(View.GONE);
+                }
+            }
+
+            if (ratings != null) {
+                ratings.setVisibility(View.VISIBLE);
+                ratings.setRating(Float.parseFloat(dialogModal.getRating()));
+            }
+
+            if (cta != null) {
+                if (cta instanceof TextView) {
+                    ((TextView) cta).setText(dialogModal.getCtaText());
+                }
+
+                if (cta instanceof Button) {
+                    ((Button) cta).setText(dialogModal.getCtaText());
+                }
+
+                if (!(cta instanceof TextView)) {
+                    throw new IllegalArgumentException("Call to Action View must be either a Button or a TextView");
+                }
+
+                cta.setOnClickListener((viewx) -> {
+                    if (this.ctaListener != null) {
+                        this.ctaListener.onCallToActionClicked(viewx);
+                    } else {
+                        String packageOrUrl = dialogModal.getPackageNameOrUrl();
+                        if (packageOrUrl.trim().startsWith("http")) {
+                            this.context.startActivity(new Intent("android.intent.action.VIEW", Uri.parse(packageOrUrl)));
+                        } else {
+                            try {
+                                this.context.startActivity(new Intent("android.intent.action.VIEW", Uri.parse("market://details?id=" + packageOrUrl)));
+                            } catch (ActivityNotFoundException var5) {
+                                this.context.startActivity(new Intent("android.intent.action.VIEW", Uri.parse("http://play.google.com/store/apps/details?id=" + packageOrUrl)));
+                            }
+                        }
+                    }
+
+                });
+            }
+
+        }
+    }
+
+
+    public void setNativeAdView(OwnAdsNativeView nativeAdView) {
+        this.nativeAdView = nativeAdView;
+    }
+
+    public void setNativeAdView(View view) {
+        this.customNativeView = view;
+    }
+
+    public boolean isAdLoadedNative() {
+        return this.isAdLoadedNative;
+    }
+
+
+    public void setNativeAdListener(NativeAdListener listener) {
+        this.mNativeAdListener = listener;
+    }
+
+    public void setCallToActionListener(NativeAdListener.CallToActionListener listener) {
+        this.ctaListener = listener;
     }
 
     public void shuffleBeforeShowingDialog() {
