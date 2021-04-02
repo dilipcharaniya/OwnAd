@@ -44,6 +44,14 @@ public class MyAdView extends RelativeLayout {
             }
         });
 
+        button.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent browse = new Intent(Intent.ACTION_VIEW, Uri.parse(myAd.getPackageNameOrUrl()));
+                context.startActivity(browse);
+            }
+        });
+
         setValues();
     }
 
