@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -64,7 +65,7 @@ public class OwnAds {
     private int bannerCount = 0;
     private MyAdView currentAdView;
 
-    private ArrayList<BannerAd> bannerAds = new ArrayList<>();
+    public ArrayList<BannerAd> bannerAds = new ArrayList<>();
     private ArrayList<InterstitialAdModel> interstitialAds = new ArrayList<>();
     private ArrayList<InterstitialAdModel> NativeAds = new ArrayList<>();
     private String feedbackEmail = "";
@@ -118,12 +119,12 @@ public class OwnAds {
                         JSONObject object = jsonArray.getJSONObject(i);
                         Log.e("BANNNNN", "" + object);
                         if (object.optString("app_adType").equals("banner")) {
-                            bannerAds.add(new BannerAd(object.getString("app_icon"),
-                                    object.getString("app_title"),
-                                    object.getString("app_desc"),
-                                    object.getString("app_uri"),
-                                    object.getString("app_cta_text"),
-                                    object.getString("app_rating")));
+                            bannerAds.add(new BannerAd(object.optString("app_icon"),
+                                    object.optString("app_title"),
+                                    object.optString("app_desc"),
+                                    object.optString("app_uri"),
+                                    object.optString("app_cta_text"),
+                                    object.optString("app_rating")));
                         }
                     }
 
@@ -191,14 +192,13 @@ public class OwnAds {
     public void loadBannerAd(final LinearLayout linearLayout) {
         this.linearLayout = linearLayout;
         bannerCount = FayazSP.getInt(countSP, 0);
-        try {
+        Log.e("BannerAdsss", "" + bannerAds.size());
+        if (bannerAds.size() > 0) {
             currentAdView = new MyAdView(context, bannerAds.get(bannerCount));
-            if (linearLayout != null)
+            if (linearLayout != null) {
                 linearLayout.addView(currentAdView);
-
+            }
             incrementAndSaveCounter();
-        } catch (Exception e) {
-            //
         }
     }
 
@@ -212,9 +212,11 @@ public class OwnAds {
     }
 
     public void autoChangeBannerAds(final int intervalSeconds) {
-        doSomethingAfter(intervalSeconds, new Runnable() {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
             @Override
             public void run() {
+                //Do something after 100ms
                 Log.d(TAG, "run: Changing Banner: " + bannerCount);
                 if (linearLayout != null) {
                     linearLayout.removeView(currentAdView);
@@ -222,7 +224,7 @@ public class OwnAds {
                     autoChangeBannerAds(intervalSeconds);
                 }
             }
-        });
+        }, intervalSeconds * 1000);
     }
 
     public void autoChangeNativeAds(final int intervalSeconds) {

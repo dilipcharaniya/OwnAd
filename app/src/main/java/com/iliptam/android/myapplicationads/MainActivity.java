@@ -18,8 +18,8 @@ import com.iliptam.android.owenads.OwnAdsNativeView;
 
 public class MainActivity extends AppCompatActivity {
 
-    OwnAds ownAds;
-    LinearLayout linearLayout;
+    public OwnAds ownAds;
+    public LinearLayout linearLayout;
     Button button;
 
     public ImageView iv_ads_logo, iv_ads_photo;
@@ -35,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
         linearLayout = findViewById(R.id.linear);
         button = findViewById(R.id.button2);
         ownAds = new OwnAds(this,
-                "https://firebasestorage.googleapis.com/v0/b/app-test-9565f.appspot.com/o/Ads.json?alt=media&token=a146f91b-7217-42bd-81e1-ced82c1fcb9b");
+                "https://firebasestorage.googleapis.com/v0/b/app-test-9565f.appspot.com/o/Ads.json?alt=media&token=6b18f403-70aa-49df-bce0-c61e66ca65ea");
 //        ownAds = new OwnAds(MainActivity.this, "https://firebasestorage.googleapis.com/v0/b/app-test-9565f.appspot.com/o/Ads.json?alt=media&token=28c23d25-c57a-4abc-b5db-a98bad5fd258"
 //        , linearLayout);
         ownAds.loadBannerAd(linearLayout);

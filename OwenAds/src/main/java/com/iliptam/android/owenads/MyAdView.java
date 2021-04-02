@@ -52,5 +52,6 @@ public class MyAdView extends RelativeLayout {
         textViewName.setText("" + myAd.getAppTitle());
         textViewDescription.setText("" + myAd.getAppDesc());
         ratingBar.setRating(Float.parseFloat(myAd.getRating()));
+        button.setText("" + myAd.getCtaText());
     }
 }
